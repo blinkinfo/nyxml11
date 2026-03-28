@@ -8,16 +8,18 @@ Automated Polymarket trading bot that monitors BTC 5-minute Up/Down markets, gen
 
 Every 5 minutes, Polymarket runs a BTC Up/Down market (will BTC price go up or down in the next 5 minutes). The bot:
 
-1. **Monitors** the current slot's Up/Down prices 85 seconds before it ends (T-85s)
-2. **Signals** if either side reaches >= $0.53 (indicating market consensus)
-3. **Trades** the signalled side in the NEXT 5-minute slot (N+1)
-4. **Resolves** the outcome after the slot ends and tracks P&L
+1. **Monitors** the NEXT slot's (N+1) Up/Down prices 85 seconds before the current slot ends (T-85s)
+2. **Signals** if either side in the N+1 market reaches >= $0.53 (indicating early market consensus)
+3. **Trades** that same side in the N+1 slot (signal source and trade target are the same market)
+4. **Resolves** the outcome after the N+1 slot ends and tracks P&L
+
+The key insight: the N+1 market opens for trading while slot N is still active. If the N+1 market already shows >= 53% conviction in one direction, the bot rides that early consensus.
 
 ### Timing
 
 - Slots align to clock: `:00`, `:05`, `:10`, `:15` ... `:55` of each hour
 - Signal check: 3 minutes 35 seconds into each slot (T-85s before end)
-- Example: Slot 10:00-10:05 -> check at 10:03:35 UTC -> trade in 10:05-10:10
+- Example: Slot 10:00-10:05 -> check N+1 (10:05-10:10) prices at 10:03:35 UTC -> trade in 10:05-10:10 if threshold met
 
 ## Features
 
@@ -100,7 +102,7 @@ autopoly/
 |   |-- formatters.py # Message formatting (UTC timeslots)
 |   |-- middleware.py  # Chat ID auth guard
 |-- core/             # Trading engine
-|   |-- strategy.py   # Signal detection (T-85s, $0.53 threshold)
+|   |-- strategy.py   # Signal detection (N+1 prices at T-85s, $0.53 threshold)
 |   |-- trader.py     # FOK order execution
 |   |-- resolver.py   # Outcome polling
 |   |-- scheduler.py  # APScheduler 5-min loop

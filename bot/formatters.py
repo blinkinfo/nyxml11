@@ -199,8 +199,8 @@ def format_help() -> str:
         "/settings \u2014 Toggle autotrade, set amount\n"
         "/help \u2014 This help message\n\n"
         "<b>How it works:</b>\n"
-        "Every 5 minutes the bot checks BTC up/down prices "
-        "85 seconds before the current slot ends. If either "
-        "side \u2265 $0.53, a signal fires for the next slot. "
+        "Every 5 minutes the bot checks the NEXT slot's BTC up/down "
+        "prices 85 seconds before the current slot ends. If either "
+        "side \u2265 $0.53, a signal fires and trades that slot. "
         "With AutoTrade ON, a FOK market order is placed automatically."
     )
