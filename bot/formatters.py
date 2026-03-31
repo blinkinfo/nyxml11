@@ -118,7 +118,7 @@ def format_trade_filled(
     return (
         f"\u2705 <b>Trade FILLED{attempt_note}</b>\n"
         "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
-        f"\u2502 {side_emoji} Side: {side}  \u23f0 {slot_label} UTC\n"
+        f"\u2502 {side_emoji} Side: {side}  \u23f0 {slot_label}\n"
         f"\u2502 \U0001f4b2 Ask Price: ${ask_price:.4f}\n"
         f"\u2502 \U0001f4b5 Amount: ${amount_usdc:.2f} USDC\n"
         f"{shares_line}"
