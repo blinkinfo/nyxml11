@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback
 from typing import Any
 
 import httpx
@@ -366,8 +367,7 @@ def _redeem_position_sync(
             }
 
     except Exception as exc:
-        import traceback as _tb
-        tb_str = _tb.format_exc()
+        tb_str = traceback.format_exc()
         log.exception("Redemption failed for condition=%s", condition_id_hex)
         return {
             "success": False,

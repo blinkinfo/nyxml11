@@ -236,7 +236,7 @@ async def _reconcile_pending() -> None:
 async def _auto_redeem_job() -> None:
     """Scheduled auto-redeem scan — runs every AUTO_REDEEM_INTERVAL_MINUTES minutes."""
     from core.redeemer import scan_and_redeem
-    from bot.formatters import format_auto_redeem_notification
+    from bot.formatters import format_auto_redeem_notification, format_error_alert
 
     # Guard: only run if auto-redeem is enabled
     enabled = await queries.is_auto_redeem_enabled()
@@ -261,10 +261,8 @@ async def _auto_redeem_job() -> None:
         import traceback as _tb
         tb_str = "".join(_tb.format_exception(type(exc), exc, exc.__traceback__))
         log.error("auto_redeem_job: scan_and_redeem raised an exception:\n%s", tb_str)
-        short = tb_str[-800:] if len(tb_str) > 800 else tb_str
         await _send_telegram(
-            f"&#x26A0;&#xFE0F; <b>Auto-Redeem Error</b>\n"
-            f"scan_and_redeem failed:\n<pre>{short}</pre>"
+            format_error_alert("auto_redeem_job", f"{type(exc).__name__}: {exc}", tb_str)
         )
         return
 
@@ -309,7 +307,7 @@ async def _auto_redeem_job() -> None:
     for r in new_results:
         if not r.get("success"):
             err = r.get("error") or "unknown error"
-            tb = r.get("traceback", "")
+            tb = r.get("error_detail", "")
             detail = tb[-600:] if tb else err[:200]
             title = (r.get("title") or r.get("condition_id", "?"))[:55]
             await _send_telegram(

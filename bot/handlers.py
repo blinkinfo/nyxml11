@@ -23,6 +23,7 @@ import config as cfg
 from bot.formatters import (
     format_demo_recent_trades,
     format_demo_stats,
+    format_error_alert,
     format_help,
     format_recent_signals,
     format_recent_trades,
