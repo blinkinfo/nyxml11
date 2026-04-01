@@ -466,7 +466,7 @@ async def _check_and_trade() -> None:
             trade_id = None  # don't resolve a non-filled trade
 
     # 6. Schedule resolution after slot N+1 ends
-    resolve_time = datetime.fromtimestamp(slot_ts + SLOT_DURATION + 15, tz=timezone.utc)
+    resolve_time = datetime.fromtimestamp(slot_ts + SLOT_DURATION + 30, tz=timezone.utc)
     if SCHEDULER is not None:
         SCHEDULER.add_job(
             _resolve_and_notify,
