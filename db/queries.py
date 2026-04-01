@@ -59,35 +59,23 @@ async def is_n2_filter_enabled() -> bool:
 
 
 async def get_n2_trade_side(current_slot_ts: int) -> str | None:
-    """Return the trade side taken at slot N-2, or None if no trade exists.
-
-    N-2 means the slot whose start timestamp is exactly 2*SLOT_DURATION (600s)
-    before current_slot_ts. We look up the signals table for a non-skipped,
-    non-filter-blocked signal at that timestamp, then check if a filled trade
-    exists for it.
-
-    Returns 'Up', 'Down', or None (no trade / slot was skipped).
+    """
+    Get the signal side at N-2 slot directly from the signals table.
+    Returns the side string (e.g. 'Up', 'Down') or None if no signal exists at that slot.
+    Reads signal outcome directly — filter_blocked signals still have a side and it counts.
     """
     from polymarket.markets import SLOT_DURATION
     n2_ts = current_slot_ts - (2 * SLOT_DURATION)
     async with aiosqlite.connect(_db()) as db:
         db.row_factory = aiosqlite.Row
-        # Find the signal for slot N-2
         cursor = await db.execute(
-            "SELECT id FROM signals WHERE slot_timestamp = ? AND skipped = 0 AND filter_blocked = 0 LIMIT 1",
+            "SELECT side FROM signals WHERE slot_timestamp = ? AND skipped = 0 LIMIT 1",
             (n2_ts,),
         )
         row = await cursor.fetchone()
         if row is None:
             return None
-        signal_id = row["id"]
-        # Find a filled trade for that signal
-        cursor2 = await db.execute(
-            "SELECT side FROM trades WHERE signal_id = ? AND status = 'filled' AND is_demo = 0 LIMIT 1",
-            (signal_id,),
-        )
-        trade_row = await cursor2.fetchone()
-        return trade_row["side"] if trade_row else None
+        return row["side"]
 
 
 # ---------------------------------------------------------------------------
@@ -657,104 +645,65 @@ async def get_recent_demo_trades(n: int = 10) -> list:
 
 
 async def get_n2_demo_trade_side(current_slot_ts: int) -> str | None:
-    """Return the demo trade side taken at slot N-2, or None if no demo trade exists.
-
-    Mirrors get_n2_trade_side() but looks at is_demo = 1 rows only.
-    Used by TradeManager when demo_trade_enabled is True so the N-2
-    diff filter compares against the demo trade history, not real trades.
-
-    Returns 'Up', 'Down', or None (no demo trade / slot was skipped).
+    """
+    Get the signal side at N-2 slot directly from the signals table (demo mode).
+    Signals are shared between demo and real — same query as real.
+    Returns the side string or None if no signal exists at that slot.
     """
     from polymarket.markets import SLOT_DURATION
     n2_ts = current_slot_ts - (2 * SLOT_DURATION)
     async with aiosqlite.connect(_db()) as db:
         db.row_factory = aiosqlite.Row
-        # Find the signal for slot N-2
         cursor = await db.execute(
-            "SELECT id FROM signals WHERE slot_timestamp = ? AND skipped = 0 AND filter_blocked = 0 LIMIT 1",
+            "SELECT side FROM signals WHERE slot_timestamp = ? AND skipped = 0 LIMIT 1",
             (n2_ts,),
         )
         row = await cursor.fetchone()
         if row is None:
             return None
-        signal_id = row["id"]
-        # Find a filled demo trade for that signal
-        cursor2 = await db.execute(
-            "SELECT side FROM trades WHERE signal_id = ? AND status = 'filled' AND is_demo = 1 LIMIT 1",
-            (signal_id,),
-        )
-        trade_row = await cursor2.fetchone()
-        return trade_row["side"] if trade_row else None
+        return row["side"]
 
 
 async def get_n4_trade_win(current_slot_ts: int) -> bool | None:
-    """Return whether the real trade at slot N-4 was a win.
-
-    N-4 means the slot whose start timestamp is exactly 4*SLOT_DURATION (1200s)
-    before current_slot_ts. We look up the signals table for a non-skipped,
-    non-filter-blocked signal at that timestamp, then check if a filled real
-    trade exists for it and whether it won.
-
-    Returns True (win), False (loss), or None (no trade / slot was skipped).
+    """
+    Get the win/loss result at N-4 slot directly from the signals table.
+    Returns True if is_win=1, False if is_win=0, None if no signal or result not yet resolved.
+    Reads signal outcome directly — filter_blocked signals are still resolved and count.
+    Conservative: returns None (block) if signal exists but is_win is NULL (unresolved).
     """
     from polymarket.markets import SLOT_DURATION
     n4_ts = current_slot_ts - (4 * SLOT_DURATION)
     async with aiosqlite.connect(_db()) as db:
         db.row_factory = aiosqlite.Row
-        # Find the signal for slot N-4
         cursor = await db.execute(
-            "SELECT id FROM signals WHERE slot_timestamp = ? AND skipped = 0 LIMIT 1",
+            "SELECT is_win FROM signals WHERE slot_timestamp = ? AND skipped = 0 LIMIT 1",
             (n4_ts,),
         )
         row = await cursor.fetchone()
         if row is None:
-            return None
-        signal_id = row["id"]
-        # Find a filled real trade for that signal
-        cursor2 = await db.execute(
-            "SELECT is_win FROM trades WHERE signal_id = ? AND status = 'filled' AND is_demo = 0 LIMIT 1",
-            (signal_id,),
-        )
-        trade_row = await cursor2.fetchone()
-        if trade_row is None:
-            return None
-        # is_win may be NULL if trade is unresolved
-        if trade_row["is_win"] is None:
-            return None
-        return trade_row["is_win"] == 1
+            return None  # No signal at N-4, conservative block
+        if row["is_win"] is None:
+            return None  # Signal exists but not yet resolved, conservative block
+        return bool(row["is_win"])
 
 
 async def get_n4_demo_trade_win(current_slot_ts: int) -> bool | None:
-    """Return whether the demo trade at slot N-4 was a win.
-
-    Mirrors get_n4_trade_win() but looks at is_demo = 1 rows only.
-    Used by TradeManager when demo_trade_enabled is True so the N-4
-    win filter checks demo trade history, not real trades.
-
-    Returns True (win), False (loss), or None (no demo trade / slot was skipped).
+    """
+    Get the win/loss result at N-4 slot directly from the signals table (demo mode).
+    Signals are shared between demo and real — same query as real.
+    Returns True if is_win=1, False if is_win=0, None if no signal or unresolved.
     """
     from polymarket.markets import SLOT_DURATION
     n4_ts = current_slot_ts - (4 * SLOT_DURATION)
     async with aiosqlite.connect(_db()) as db:
         db.row_factory = aiosqlite.Row
-        # Find the signal for slot N-4
         cursor = await db.execute(
-            "SELECT id FROM signals WHERE slot_timestamp = ? AND skipped = 0 LIMIT 1",
+            "SELECT is_win FROM signals WHERE slot_timestamp = ? AND skipped = 0 LIMIT 1",
             (n4_ts,),
         )
         row = await cursor.fetchone()
         if row is None:
             return None
-        signal_id = row["id"]
-        # Find a filled demo trade for that signal
-        cursor2 = await db.execute(
-            "SELECT is_win FROM trades WHERE signal_id = ? AND status = 'filled' AND is_demo = 1 LIMIT 1",
-            (signal_id,),
-        )
-        trade_row = await cursor2.fetchone()
-        if trade_row is None:
+        if row["is_win"] is None:
             return None
-        # is_win may be NULL if trade is unresolved
-        if trade_row["is_win"] is None:
-            return None
-        return trade_row["is_win"] == 1
+        return bool(row["is_win"])
