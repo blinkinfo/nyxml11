@@ -307,15 +307,17 @@ class MLStrategy(BaseStrategy):
 
             entry_price    = prices["up_price"]    if side == "Up" else prices["down_price"]
             opposite_price = prices["down_price"]  if side == "Up" else prices["up_price"]
-            token_id       = prices["up_token_id"] if side == "Up" else prices["down_token_id"]
+            token_id          = prices["up_token_id"] if side == "Up" else prices["down_token_id"]
+            opposite_token_id = prices["down_token_id"] if side == "Up" else prices["up_token_id"]
 
             return {
                 **base_fields,
-                "skipped":        False,
-                "side":           side,
-                "entry_price":    entry_price,
-                "opposite_price": opposite_price,
-                "token_id":       token_id,
+                "skipped":           False,
+                "side":              side,
+                "entry_price":       entry_price,
+                "opposite_price":    opposite_price,
+                "token_id":          token_id,
+                "opposite_token_id": opposite_token_id,
                 "pattern":        f"p_up={prob:.4f},p_down={prob_down:.4f}",
                 # Structured ML fields for rich Telegram formatting
                 "ml_p_up":          prob,

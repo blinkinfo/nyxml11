@@ -229,6 +229,7 @@ async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     trade_pct = await queries.get_trade_pct()
     demo_trade = await queries.is_demo_trade_enabled()
     demo_bankroll = await queries.get_demo_bankroll()
+    invert_trades = await queries.is_invert_trades_enabled()
     at_text = "ON" if autotrade else "OFF"
     mode_summary = f"{trade_pct:.1f}%" if trade_mode == "pct" else f"${trade_amount:.2f}"
     dt_text = "ON" if demo_trade else "OFF"
@@ -236,7 +237,7 @@ async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"\u2699\ufe0f <b>Settings</b>\n"
         f"AutoTrade: {at_text}  |  Mode: {mode_summary}  |  Demo: {dt_text}"
     )
-    kb = settings_keyboard(autotrade, trade_amount, auto_redeem, demo_trade, demo_bankroll, trade_mode, trade_pct)
+    kb = settings_keyboard(autotrade, trade_amount, auto_redeem, demo_trade, demo_bankroll, trade_mode, trade_pct, invert_trades)
     if update.callback_query:
         await update.callback_query.answer()
         await _safe_edit(update.callback_query, text, reply_markup=kb)
@@ -552,6 +553,13 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     elif data == "reset_demo_bankroll":
         await queries.reset_demo_bankroll(1000.00)
         await query.answer("Demo bankroll reset to $1000.00")
+        await cmd_settings(update, context)
+
+    elif data == "toggle_invert_trades":
+        current = await queries.is_invert_trades_enabled()
+        await queries.set_setting("invert_trades_enabled", "false" if current else "true")
+        new_state = "OFF" if current else "ON"
+        await query.answer(f"Invert Trades {new_state}")
         await cmd_settings(update, context)
 
     elif data == "cmd_demo":

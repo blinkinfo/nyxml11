@@ -59,6 +59,7 @@ def settings_keyboard(
     demo_bankroll: float = 1000.00,
     trade_mode: str = "fixed",
     trade_pct: float = 5.0,
+    invert_trades_on: bool = False,
 ) -> InlineKeyboardMarkup:
     # Row 1: paired toggles — related switches side-by-side
     at_label = f"\U0001f916 AutoTrade: {'ON' if autotrade_on else 'OFF'}"
@@ -94,6 +95,11 @@ def settings_keyboard(
         ],
         # Destructive action — full-width, alone
         [InlineKeyboardButton("\U0001f504 Reset Bankroll", callback_data="reset_demo_bankroll")],
+        # Invert Trades
+        [InlineKeyboardButton(
+            f"\U0001f504 Invert Trades: {'ON' if invert_trades_on else 'OFF'}",
+            callback_data="toggle_invert_trades",
+        )],
         # Back
         [InlineKeyboardButton("\U0001f519 Back to Menu", callback_data="cmd_menu")],
     ])

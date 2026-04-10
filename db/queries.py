@@ -142,6 +142,12 @@ async def is_auto_redeem_enabled() -> bool:
     return val == "true"
 
 
+async def is_invert_trades_enabled() -> bool:
+    """Return True if invert-trades mode is toggled on in settings."""
+    val = await get_setting("invert_trades_enabled")
+    return val == "true"
+
+
 # ---------------------------------------------------------------------------
 # Signal CRUD
 # ---------------------------------------------------------------------------

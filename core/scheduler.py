@@ -413,6 +413,13 @@ async def _check_and_trade() -> None:
         opposite_price = signal["opposite_price"]
         token_id = signal["token_id"]
         pattern = signal.get("pattern")
+
+        # Invert trades: swap side, prices, and token_id to bet opposite the signal.
+        invert_trades = await queries.is_invert_trades_enabled()
+        if invert_trades:
+            side = "Down" if side == "Up" else "Up"
+            entry_price, opposite_price = opposite_price, entry_price
+            token_id = signal.get("opposite_token_id", token_id)
         slug = signal.get("slot_n1_slug", f"btc-updown-5m-{slot_ts}")
 
         signal_id = await queries.insert_signal(
