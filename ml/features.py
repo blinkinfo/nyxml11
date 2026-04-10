@@ -248,9 +248,15 @@ def build_features(
     _ATR_WINDOW = 288
     atr_shifted = atr5.shift(1)
     def _rolling_percentile(s: pd.Series, w: int) -> pd.Series:
-        return s.rolling(w, min_periods=14).apply(
-            lambda x: float(np.sum(x[:-1] < x[-1])) / max(len(x) - 1, 1), raw=True
-        )
+        # min_periods=14 allows partial windows during ATR warmup rows;
+        # NaNs within the window are stripped before ranking so warmup NaNs
+        # don't silently corrupt the percentile (NaN < value == False in numpy).
+        def _pct(x: np.ndarray) -> float:
+            x = x[~np.isnan(x)]
+            if len(x) < 2:
+                return np.nan
+            return float(np.sum(x[:-1] < x[-1])) / max(len(x) - 1, 1)
+        return s.rolling(w, min_periods=14).apply(_pct, raw=True)
     df5["atr_percentile_24h"] = _rolling_percentile(atr_shifted, _ATR_WINDOW)
     roll = atr_shifted.rolling(_ATR_WINDOW, min_periods=14)
     atr_roll_mean = roll.mean()
@@ -379,19 +385,16 @@ def build_live_features(
             mask1h = df1h["timestamp"] <= ts_n1
             if mask1h.any():
                 idx1h = df1h[mask1h].index[-1]
-                # Scan forward from idx1h to find a row with valid ATR (warmup may cause NaN)
-                atr1h_val = np.nan
-                valid_idx1h = idx1h
-                for _i in range(idx1h, len(df1h)):
-                    if pd.notna(atr1h.iloc[_i]) and atr1h.iloc[_i] > 0:
-                        atr1h_val = atr1h.iloc[_i]
-                        valid_idx1h = _i
-                        break
+                # Use ATR at idx1h only — do NOT scan forward into future candles.
+                # Scanning forward would pull OHLC/EMA data from candles that haven't
+                # closed yet at the time of the N-1 5m bar, introducing lookahead bias.
+                # If ATR is NaN here (warmup), fall back to NaN for all 1h features.
+                atr1h_val = atr1h.iloc[idx1h]
                 if pd.notna(atr1h_val) and atr1h_val > 0:
-                    body_ratio_1h = (df1h["close"].iloc[valid_idx1h] - df1h["open"].iloc[valid_idx1h]) / atr1h_val
-                    dir_1h = np.sign(df1h["close"].iloc[valid_idx1h] - df1h["open"].iloc[valid_idx1h])
+                    body_ratio_1h = (df1h["close"].iloc[idx1h] - df1h["open"].iloc[idx1h]) / atr1h_val
+                    dir_1h = np.sign(df1h["close"].iloc[idx1h] - df1h["open"].iloc[idx1h])
                     ema9 = df1h["close"].ewm(span=9, adjust=False).mean()
-                    ema9_slope_1h = (ema9.iloc[valid_idx1h] - ema9.iloc[valid_idx1h - 1]) / atr1h_val if valid_idx1h > 0 else np.nan
+                    ema9_slope_1h = (ema9.iloc[idx1h] - ema9.iloc[idx1h - 1]) / atr1h_val if idx1h > 0 else np.nan
                 else:
                     body_ratio_1h = dir_1h = ema9_slope_1h = np.nan
             else:
@@ -464,10 +467,9 @@ def build_live_features(
                 atr_percentile_24h = np.nan
             if len(window_vals) >= 2:
                 w_mean = float(np.mean(window_vals))
-                w_std  = float(np.std(window_vals))
+                w_std  = float(np.std(window_vals, ddof=1))
                 vol_regime = (atr_n1 - w_mean) / max(w_std, 1e-10)
             else:
-                vol_regime = np.nan
                 vol_regime = np.nan
         else:
             atr_percentile_24h = np.nan

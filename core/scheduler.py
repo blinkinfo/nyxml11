@@ -453,6 +453,7 @@ async def _check_and_trade() -> None:
                 ml_p_down=signal["ml_p_down"],
                 ml_up_threshold=signal["ml_up_threshold"],
                 ml_down_threshold=signal["ml_down_threshold"],
+                ml_down_enabled=signal.get("ml_down_enabled", False),
             )
         else:
             msg = format_signal(

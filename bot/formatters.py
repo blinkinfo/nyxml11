@@ -73,6 +73,7 @@ def format_ml_signal(
     ml_p_down: float,
     ml_up_threshold: float,
     ml_down_threshold: float,
+    ml_down_enabled: bool = False,
 ) -> str:
     """ML signal notification — Option A card with confidence and edge."""
     side_emoji = "\U0001f4c8" if side == "Up" else "\U0001f4c9"
@@ -96,7 +97,7 @@ def format_ml_signal(
         los_prob  = ml_p_up
 
     edge = round((win_prob - win_thr) * 100, 1)
-    edge_str = f"+{edge:.1f}%"
+    edge_str = f"{edge:+.1f}%"
 
     return (
         "\U0001f4e1 <b>Signal Fired!</b>  \U0001f916 ML\n"
@@ -123,13 +124,16 @@ def format_ml_skip(
     ml_down_enabled: bool,
 ) -> str:
     """ML no-signal notification — Option C card with shortfall or disabled status."""
+    # Shortfall is threshold - prob; positive means below threshold (normal skip),
+    # negative means above threshold (that side passed but the other caused the skip).
+    # Use :+.1f so the sign is always explicit — avoids "short −-1.2%" double-sign.
     up_short   = round((ml_up_threshold - ml_p_up) * 100, 1)
     down_short = round((ml_down_threshold - ml_p_down) * 100, 1)
 
-    up_note   = f"short \u2212{up_short:.1f}%"
+    up_note   = f"short {up_short:+.1f}%"
 
     if ml_down_enabled:
-        down_note = f"short \u2212{down_short:.1f}%"
+        down_note = f"short {down_short:+.1f}%"
     else:
         down_note = "disabled"
 
@@ -141,7 +145,7 @@ def format_ml_skip(
         "\u2502 \U0001f9e0 ML Output\n"
         f"\u2502  \u2715 UP    {ml_p_up*100:.1f}%   {up_note}\n"
         f"\u2502  \u2715 DOWN  {ml_p_down*100:.1f}%   {down_note}\n"
-        f"\u2502  Threshold \u2265 {ml_up_threshold*100:.1f}%\n"
+        f"\u2502  UP thr \u2265 {ml_up_threshold*100:.1f}%  \u2502  DOWN thr \u2265 {ml_down_threshold*100:.1f}%\n"
         "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
     )
 

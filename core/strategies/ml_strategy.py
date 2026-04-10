@@ -23,7 +23,7 @@ import config as cfg
 
 log = logging.getLogger(__name__)
 
-FEATURE_COLS = feat_eng.FEATURE_COLS  # 22 features in exact order
+FEATURE_COLS = feat_eng.FEATURE_COLS  # 26 features in exact order
 
 # Module-level reload flag so cmd_promote_model can signal a reload
 _RELOAD_REQUESTED = False
@@ -293,6 +293,14 @@ class MLStrategy(BaseStrategy):
                     **base_fields,
                     "pattern": f"p={prob:.4f}",
                     "reason": "Market data unavailable",
+                    # ML inference already completed — include structured fields so
+                    # the scheduler can render the rich ML skip card instead of
+                    # falling back to the generic format_skip() card.
+                    "ml_p_up":           prob,
+                    "ml_p_down":         prob_down,
+                    "ml_up_threshold":   up_threshold,
+                    "ml_down_threshold": down_threshold,
+                    "ml_down_enabled":   down_enabled,
                 }
 
             entry_price    = prices["up_price"]    if side == "Up" else prices["down_price"]

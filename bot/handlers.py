@@ -665,7 +665,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             query,
             f"\u2699\ufe0f <b>Set ML DOWN Threshold</b>\n\nCurrent DOWN threshold: <b>{threshold:.3f}</b>\n\n"
             "Type the new DOWN threshold value (0.50 \u2013 0.95):\n"
-            "Example: <code>0.48</code>",
+            "Example: <code>0.55</code>",
         )
         context.user_data["awaiting_ml_down_threshold"] = True
 
@@ -838,7 +838,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 raise ValueError("out of range")
         except ValueError:
             await update.message.reply_text(
-                "\u274c Invalid value. Enter a number between 0.50 and 0.95 (e.g. <code>0.48</code>).",
+                "\u274c Invalid value. Enter a number between 0.50 and 0.95 (e.g. <code>0.55</code>).",
                 parse_mode="HTML",
             )
             return
@@ -989,10 +989,10 @@ async def cmd_set_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 @auth_check
 async def cmd_set_down_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Set ML DOWN inference threshold. Usage: /set_down_threshold 0.48"""
+    """Set ML DOWN inference threshold. Usage: /set_down_threshold 0.55"""
     if not context.args:
         await update.message.reply_text(
-            "Usage: /set_down_threshold &lt;value&gt;\nExample: /set_down_threshold 0.48\nValid range: 0.50 – 0.95",
+            "Usage: /set_down_threshold &lt;value&gt;\nExample: /set_down_threshold 0.55\nValid range: 0.50 – 0.95",
             parse_mode="HTML",
         )
         return
@@ -1000,7 +1000,7 @@ async def cmd_set_down_threshold(update: Update, context: ContextTypes.DEFAULT_T
         threshold = float(context.args[0])
     except (ValueError, IndexError):
         await update.message.reply_text(
-            "Invalid value. Example: /set_down_threshold 0.48", parse_mode="HTML"
+            "Invalid value. Example: /set_down_threshold 0.55", parse_mode="HTML"
         )
         return
     if not (0.50 <= threshold <= 0.95):

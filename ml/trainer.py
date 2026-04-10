@@ -205,18 +205,21 @@ def train(df_features: pd.DataFrame, slot: str = "current") -> dict:
         raise ValueError(f"Too few samples to train: {n}")
 
     # Time-series split: DO NOT SHUFFLE
-    train_end = int(n * 0.75)
-    val_start = int(train_end * 0.80)
+    # split_boundary = index where validation ends and test begins (75% of data).
+    # val_start      = index where training ends and validation begins (80% of split_boundary).
+    # Layout: [0 : val_start] = train, [val_start : split_boundary] = val, [split_boundary :] = test
+    split_boundary = int(n * 0.75)
+    val_start = int(split_boundary * 0.80)
 
     log.info("train: n=%d train=[0:%d] val=[%d:%d] test=[%d:%d]",
-             n, val_start, val_start, train_end, train_end, n)
+             n, val_start, val_start, split_boundary, split_boundary, n)
 
     X = df_features[FEATURE_COLS].values
     y = df_features["target"].values
 
     X_train, y_train = X[:val_start], y[:val_start]
-    X_val, y_val = X[val_start:train_end], y[val_start:train_end]
-    X_test, y_test = X[train_end:], y[train_end:]
+    X_val, y_val = X[val_start:split_boundary], y[val_start:split_boundary]
+    X_test, y_test = X[split_boundary:], y[split_boundary:]
 
     log.info("train: X_train=%s X_val=%s X_test=%s", X_train.shape, X_val.shape, X_test.shape)
 
@@ -336,8 +339,8 @@ def train(df_features: pd.DataFrame, slot: str = "current") -> dict:
         # Common
         "sample_count": n,
         "train_size": val_start,
-        "val_size": train_end - val_start,
-        "test_size": n - train_end,
+        "val_size": split_boundary - val_start,
+        "test_size": n - split_boundary,
         "feature_cols": FEATURE_COLS,
         "best_iteration": model.best_iteration,
         "blocked": blocked,
