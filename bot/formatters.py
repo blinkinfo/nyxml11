@@ -99,6 +99,13 @@ def format_ml_signal(
     edge = round((win_prob - win_thr) * 100, 1)
     edge_str = f"{edge:+.1f}%"
 
+    # For the threshold row: if firing DOWN but DOWN is disabled, show "disabled"
+    # (shouldn't normally fire if disabled, but guard defensively)
+    if side == "Down" and not ml_down_enabled:
+        thr_line = "\u2502  Threshold: \u2265 disabled\n"
+    else:
+        thr_line = f"\u2502  Threshold: \u2265 {win_thr*100:.1f}%\n"
+
     return (
         "\U0001f4e1 <b>Signal Fired!</b>  \U0001f916 ML\n"
         "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
@@ -109,7 +116,7 @@ def format_ml_signal(
         "\u2502 \U0001f9e0 ML Confidence\n"
         f"\u2502  {win_arrow} {win_label}   {win_prob*100:.1f}%  \u2705  edge {edge_str}\n"
         f"\u2502  {los_arrow} {los_label}   {los_prob*100:.1f}%\n"
-        f"\u2502  Threshold: \u2265 {win_thr*100:.1f}%\n"
+        f"{thr_line}"
         "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
     )
 

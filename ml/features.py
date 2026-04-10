@@ -461,7 +461,7 @@ def build_live_features(
             # Use up to _ATR_WINDOW prior values (excluding N-1 itself for percentile rank)
             window_vals = atr5_arr[max(0, len(atr5_arr)-_ATR_WINDOW-1):-2]  # values before N-1
             window_vals = window_vals[~np.isnan(window_vals)]  # strip ATR warmup NaNs
-            if len(window_vals) >= 1:
+            if len(window_vals) >= 14:
                 atr_percentile_24h = float(np.sum(window_vals < atr_n1)) / max(len(window_vals), 1)
             else:
                 atr_percentile_24h = np.nan
