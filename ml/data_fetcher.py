@@ -11,7 +11,6 @@ from datetime import datetime, timezone, timedelta
 
 import ccxt
 import httpx
-import numpy as np
 import pandas as pd
 
 log = logging.getLogger(__name__)
@@ -114,41 +113,184 @@ def fetch_1h(start_ms: int, end_ms: int) -> pd.DataFrame:
 # Section 3.4 — Funding rate history
 # ---------------------------------------------------------------------------
 
-def fetch_funding(start_ms: int, end_ms: int) -> pd.DataFrame:
-    """Fetch BTC/USDT:USDT funding rate history from MEXC."""
-    exchange = ccxt.mexc({"options": {"defaultType": "swap"}})
-    exchange.load_markets()
+MEXC_FUNDING_URL = "https://contract.mexc.com/api/v1/contract/funding_rate/history"
 
+
+def _funding_records_to_df(records: list, start_ms: int, end_ms: int) -> pd.DataFrame:
+    """Deduplicate, filter to [start_ms, end_ms], sort, and return clean DataFrame."""
+    if not records:
+        return pd.DataFrame(columns=["timestamp", "funding_rate"])
+    df = pd.DataFrame(records)
+    df = df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+    start_dt = pd.Timestamp(start_ms, unit="ms", tz="UTC")
+    end_dt = pd.Timestamp(end_ms, unit="ms", tz="UTC")
+    df = df[(df["timestamp"] >= start_dt) & (df["timestamp"] < end_dt)].reset_index(drop=True)
+    return df
+
+
+def _fetch_funding_ccxt(exchange, start_ms: int, end_ms: int) -> list:
+    """Try to paginate funding rate history via ccxt with stall detection.
+
+    Returns a list of raw record dicts with keys 'timestamp' and 'funding_rate'.
+    Stops if: batch is empty, last_ts stalls (two consecutive pages same), or last_ts >= end_ms.
+    Does NOT stop just because len(batch) < 100.
+    """
     records = []
     since = start_ms
+    prev_last_ts: int | None = None
+
     while since < end_ms:
         try:
             batch = exchange.fetch_funding_rate_history("BTC/USDT:USDT", since=since, limit=100)
         except Exception as e:
-            log.warning("fetch_funding_rate_history error since=%d: %s", since, e)
+            log.warning("ccxt fetch_funding_rate_history error since=%d: %s", since, e)
             break
         if not batch:
             break
         for r in batch:
             ts = r.get("timestamp")
             rate = r.get("fundingRate")
-            if ts is not None and rate is not None and ts < end_ms:
+            if ts is not None and rate is not None:
                 records.append({
                     "timestamp": pd.Timestamp(ts, unit="ms", tz="UTC"),
                     "funding_rate": float(rate),
                 })
-        last_ts = batch[-1].get("timestamp", 0)
-        if last_ts >= end_ms or len(batch) < 100:
+        last_ts = batch[-1].get("timestamp", 0) or 0
+        # Stall detection: same last_ts as previous page means exchange ignores `since`
+        if last_ts == prev_last_ts:
+            log.info("ccxt funding pagination stalled at ts=%d — stopping ccxt strategy", last_ts)
             break
+        if last_ts >= end_ms:
+            break
+        prev_last_ts = last_ts
         since = last_ts + 1
         time.sleep(0.1)
 
-    if not records:
-        return pd.DataFrame(columns=["timestamp", "funding_rate"])
+    return records
 
-    df = pd.DataFrame(records)
-    df = df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
-    return df
+
+def _fetch_funding_rest(start_ms: int, end_ms: int) -> list:
+    """Fall back to MEXC direct REST API for funding rate history.
+
+    Paginates GET https://contract.mexc.com/api/v1/contract/funding_rate/history
+    with page_num (1-based) and page_size=100.
+    Each record has settleTime (ms) and fundingRate.
+    Stops when a page returns no data or all records are older than start_ms.
+    """
+    records = []
+    page_num = 1
+
+    with httpx.Client(timeout=30) as client:
+        while True:
+            params = {
+                "symbol": "BTC_USDT",
+                "page_num": page_num,
+                "page_size": 100,
+            }
+            try:
+                resp = client.get(MEXC_FUNDING_URL, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception as e:
+                log.warning("MEXC REST funding page %d error: %s", page_num, e)
+                break
+
+            page_data = data.get("data", {})
+            # The API returns {"data": {"resultList": [...], ...}} or similar
+            if isinstance(page_data, dict):
+                items = page_data.get("resultList", page_data.get("result", []))
+            elif isinstance(page_data, list):
+                items = page_data
+            else:
+                items = []
+
+            if not items:
+                log.info("MEXC REST funding page %d returned empty — stopping", page_num)
+                break
+
+            page_records = []
+            for item in items:
+                ts = item.get("settleTime")
+                rate = item.get("fundingRate")
+                if ts is not None and rate is not None:
+                    page_records.append({
+                        "timestamp": pd.Timestamp(int(ts), unit="ms", tz="UTC"),
+                        "funding_rate": float(rate),
+                    })
+
+            if not page_records:
+                break
+
+            records.extend(page_records)
+
+            # REST returns newest-first; if oldest record on this page is before start_ms, we have enough
+            oldest_ts = min(r["timestamp"] for r in page_records)
+            start_dt = pd.Timestamp(start_ms, unit="ms", tz="UTC")
+            if oldest_ts <= start_dt:
+                log.info("MEXC REST funding: reached start boundary at page %d", page_num)
+                break
+
+            page_num += 1
+            time.sleep(0.1)
+
+    log.info("MEXC REST funding strategy: fetched %d raw records across %d pages", len(records), page_num)
+    return records
+
+
+def fetch_funding(start_ms: int, end_ms: int) -> pd.DataFrame:
+    """Fetch BTC/USDT:USDT funding rate history from MEXC.
+
+    Strategy 1: ccxt with stall detection (stops if two consecutive pages return
+    the same last timestamp, meaning the exchange ignores the `since` param).
+    Strategy 2: If ccxt coverage < 80% of the requested window, fall back to
+    MEXC's direct REST endpoint which supports page_num pagination.
+    """
+    window_ms = end_ms - start_ms
+    coverage_threshold = 0.80
+
+    # --- Strategy 1: ccxt ---
+    exchange = ccxt.mexc({"options": {"defaultType": "swap"}})
+    exchange.load_markets()
+
+    ccxt_records = _fetch_funding_ccxt(exchange, start_ms, end_ms)
+    ccxt_df = _funding_records_to_df(ccxt_records, start_ms, end_ms)
+
+    if not ccxt_df.empty:
+        covered_ms = (
+            ccxt_df["timestamp"].max() - ccxt_df["timestamp"].min()
+        ).total_seconds() * 1000
+        coverage = covered_ms / window_ms if window_ms > 0 else 0.0
+    else:
+        coverage = 0.0
+
+    log.info(
+        "fetch_funding ccxt: %d records, coverage=%.1f%% (threshold=%.0f%%)",
+        len(ccxt_df), coverage * 100, coverage_threshold * 100,
+    )
+
+    if coverage >= coverage_threshold:
+        log.info("fetch_funding: ccxt strategy sufficient — returning %d records", len(ccxt_df))
+        return ccxt_df
+
+    # --- Strategy 2: MEXC direct REST fallback ---
+    log.info(
+        "fetch_funding: ccxt coverage %.1f%% < %.0f%% — falling back to MEXC REST API",
+        coverage * 100, coverage_threshold * 100,
+    )
+
+    rest_records = _fetch_funding_rest(start_ms, end_ms)
+    rest_df = _funding_records_to_df(rest_records, start_ms, end_ms)
+
+    if not rest_df.empty:
+        log.info("fetch_funding: REST strategy returned %d records", len(rest_df))
+        return rest_df
+
+    # Both failed — return whatever ccxt gave us (may be empty)
+    log.warning(
+        "fetch_funding: both strategies failed or returned insufficient data — "
+        "returning %d ccxt records", len(ccxt_df)
+    )
+    return ccxt_df if not ccxt_df.empty else pd.DataFrame(columns=["timestamp", "funding_rate"])
 
 
 # ---------------------------------------------------------------------------
@@ -263,19 +405,19 @@ def fetch_all(months: int = 5) -> dict:
     df5 = fetch_5m(start_ms, end_ms)
     print(f"  -> {len(df5)} 5m candles")
 
-    print(f"  Fetching 15m candles...")
+    print("  Fetching 15m candles...")
     df15 = fetch_15m(start_ms, end_ms)
     print(f"  -> {len(df15)} 15m candles")
 
-    print(f"  Fetching 1h candles...")
+    print("  Fetching 1h candles...")
     df1h = fetch_1h(start_ms, end_ms)
     print(f"  -> {len(df1h)} 1h candles")
 
-    print(f"  Fetching funding rate history...")
+    print("  Fetching funding rate history...")
     funding = fetch_funding(start_ms, end_ms)
     print(f"  -> {len(funding)} funding records")
 
-    print(f"  Fetching CVD data...")
+    print("  Fetching CVD data...")
     cvd = fetch_cvd(start_ms, end_ms)
     print(f"  -> {len(cvd)} CVD candles")
 
