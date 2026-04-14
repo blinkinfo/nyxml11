@@ -1251,8 +1251,10 @@ async def _retrain_background(application, chat_id) -> None:
                 threshold,
                 down_enabled, down_val_wr, down_test_wr, down_threshold,
             )
-            text = format_retrain_blocked(meta, threshold)
-            await notify(text, reply_markup=retrain_blocked_keyboard())
+            main_msg, risk_msg = format_retrain_blocked(meta, threshold)
+            await notify(main_msg, reply_markup=retrain_blocked_keyboard())
+            if risk_msg:
+                await notify(risk_msg)
         else:
             log.info(
                 "Retrain complete. val_wr=%.4f test_wr=%.4f | "
@@ -1261,8 +1263,10 @@ async def _retrain_background(application, chat_id) -> None:
                 result.get("test_metrics", {}).get("wr", 0),
                 down_enabled, down_val_wr, down_test_wr, down_threshold,
             )
-            text = format_retrain_complete(meta, threshold)
-            await notify(text)
+            main_msg, risk_msg = format_retrain_complete(meta, threshold)
+            await notify(main_msg)
+            if risk_msg:
+                await notify(risk_msg)
             # Auto-promote: UP passed the gate — promote candidate to current now.
             try:
                 from ml import model_store as _ms

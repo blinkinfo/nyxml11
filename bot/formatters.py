@@ -20,6 +20,70 @@ def _e(value: object) -> str:
 
 _RISK_VAL_W = 10
 
+# Label column width for the risk table (longest label = "Profit factor" = 13 chars,
+# padded to 14 so there is always one space before the value column).
+_RISK_LABEL_W = 14
+
+
+def _build_risk_table(meta: dict) -> str | None:
+    """Return a fully self-contained <code> risk table for a separate Telegram message.
+
+    Returns None when neither val_risk nor test_risk is present in *meta*.
+    The returned string is a standalone HTML snippet — it must be sent with
+    parse_mode='HTML' and requires no surrounding box-drawing characters.
+    """
+    val_risk  = meta.get("val_risk", {})
+    test_risk = meta.get("test_risk", {})
+    if not val_risk and not test_risk:
+        return None
+
+    wf_dd_d   = meta.get("wf_worst_dd_dollar", 0.0)
+    wf_dd_pct = meta.get("wf_worst_dd_pct", 0.0)
+    wf_ls     = meta.get("wf_worst_loss_streak", 0)
+
+    v_dd_d  = _risk_dd_dollar(val_risk.get("max_dd_dollar", 0.0))
+    t_dd_d  = _risk_dd_dollar(test_risk.get("max_dd_dollar", 0.0))
+    v_dd_p  = _risk_dd_pct(val_risk.get("max_dd_pct", 0.0))
+    t_dd_p  = _risk_dd_pct(test_risk.get("max_dd_pct", 0.0))
+    v_ls    = _risk_streak(val_risk.get("max_loss_streak", 0))
+    t_ls    = _risk_streak(test_risk.get("max_loss_streak", 0))
+    v_ws    = _risk_streak(val_risk.get("max_win_streak", 0))
+    t_ws    = _risk_streak(test_risk.get("max_win_streak", 0))
+    v_pf    = _risk_pf(val_risk.get("profit_factor", 0.0))
+    t_pf    = _risk_pf(test_risk.get("profit_factor", 0.0))
+    v_sh    = _risk_sharpe(val_risk.get("sharpe", 0.0))
+    t_sh    = _risk_sharpe(test_risk.get("sharpe", 0.0))
+    wf_d    = _risk_dd_dollar(wf_dd_d)
+    wf_p    = _risk_dd_pct(wf_dd_pct)
+    wf_ls_s = _risk_streak(wf_ls)
+    blank   = " " * _RISK_VAL_W
+
+    # Header row — label column + Val + sep + Test, all fixed-width
+    lw = _RISK_LABEL_W
+    hdr_label = "Metric".ljust(lw)
+    hdr_val   = "Val".ljust(_RISK_VAL_W)
+    hdr_test  = "Test".ljust(_RISK_VAL_W)
+
+    def row(label: str, val: str, test: str) -> str:
+        return f"{label.ljust(lw)}{val} \u2502 {test}\n"
+
+    table = (
+        f"{hdr_label}{hdr_val} \u2502 {hdr_test}\n"
+        + "\u2500" * (lw + _RISK_VAL_W + 3 + _RISK_VAL_W) + "\n"
+        + row("Max DD $",      v_dd_d,  t_dd_d)
+        + row("Max DD %",      v_dd_p,  t_dd_p)
+        + row("Loss streak",   v_ls,    t_ls)
+        + row("Win streak",    v_ws,    t_ws)
+        + row("Profit factor", v_pf,    t_pf)
+        + row("Sharpe",        v_sh,    t_sh)
+        + "\u2500" * (lw + _RISK_VAL_W + 3 + _RISK_VAL_W) + "\n"
+        + row("WF worst DD $", wf_d,    blank)
+        + row("WF worst DD %", wf_p,    blank)
+        + f"{'WF loss streak'.ljust(lw)}{wf_ls_s} \u2502 {blank}"
+    )
+
+    return f"\u26a0\ufe0f <b>Risk Metrics</b>\n<code>{table}</code>"
+
 
 def _risk_dd_dollar(v: float) -> str:
     """Format a drawdown dollar value to a fixed-width, right-aligned field.
@@ -861,10 +925,14 @@ def format_retrain_started() -> str:
     )
 
 
-def format_retrain_blocked(meta: dict, threshold: float) -> str:
+def format_retrain_blocked(meta: dict, threshold: float) -> tuple[str, str | None]:
     """Notification sent when retrain completes but fails the 59% deployment gate.
 
     The candidate IS saved — the user must decide to promote or discard.
+
+    Returns a tuple of (main_message, risk_message).
+    *risk_message* is None when no risk data is available.
+    Both messages must be sent with parse_mode='HTML'.
     """
     _GATE = 0.58
     down_enabled = meta.get("down_enabled", False)
@@ -911,52 +979,7 @@ def format_retrain_blocked(meta: dict, threshold: float) -> str:
             "\u2502   Not validated\n"
         )
 
-    # Risk block — monospace <code> table, Val | Test columns, fixed-width padding
-    val_risk  = meta.get("val_risk", {})
-    test_risk = meta.get("test_risk", {})
-    wf_dd_d   = meta.get("wf_worst_dd_dollar", 0.0)
-    wf_dd_pct = meta.get("wf_worst_dd_pct", 0.0)
-    wf_ls     = meta.get("wf_worst_loss_streak", 0)
-
-    if val_risk or test_risk:
-        # Column layout (monospace) — identical to format_retrain_complete.
-        # All value fields are fixed-width so │ remains aligned.
-        v_dd_d  = _risk_dd_dollar(val_risk.get("max_dd_dollar", 0.0))
-        t_dd_d  = _risk_dd_dollar(test_risk.get("max_dd_dollar", 0.0))
-        v_dd_p  = _risk_dd_pct(val_risk.get("max_dd_pct", 0.0))
-        t_dd_p  = _risk_dd_pct(test_risk.get("max_dd_pct", 0.0))
-        v_ls    = _risk_streak(val_risk.get("max_loss_streak", 0))
-        t_ls    = _risk_streak(test_risk.get("max_loss_streak", 0))
-        v_ws    = _risk_streak(val_risk.get("max_win_streak", 0))
-        t_ws    = _risk_streak(test_risk.get("max_win_streak", 0))
-        v_pf    = _risk_pf(val_risk.get("profit_factor", 0.0))
-        t_pf    = _risk_pf(test_risk.get("profit_factor", 0.0))
-        v_sh    = _risk_sharpe(val_risk.get("sharpe", 0.0))
-        t_sh    = _risk_sharpe(test_risk.get("sharpe", 0.0))
-        wf_d    = _risk_dd_dollar(wf_dd_d)
-        wf_p    = _risk_dd_pct(wf_dd_pct)
-        wf_ls_s = _risk_streak(wf_ls)
-        _blank  = " " * _RISK_VAL_W
-        risk_section = (
-            "\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
-            "\u2502 \u26a0\ufe0f <b>Risk</b>\n"
-            "\u2502 <code>"
-            "Metric         Val        \u2502 Test      \n"
-            f"Max DD $       {v_dd_d} \u2502 {t_dd_d}\n"
-            f"Max DD %       {v_dd_p} \u2502 {t_dd_p}\n"
-            f"Loss streak    {v_ls} \u2502 {t_ls}\n"
-            f"Win streak     {v_ws} \u2502 {t_ws}\n"
-            f"Profit factor  {v_pf} \u2502 {t_pf}\n"
-            f"Sharpe         {v_sh} \u2502 {t_sh}\n"
-            f"WF DD $        {wf_d} \u2502 {_blank}\n"
-            f"WF DD %        {wf_p} \u2502 {_blank}\n"
-            f"WF loss strk   {wf_ls_s} \u2502 {_blank}"
-            "</code>\n"
-        )
-    else:
-        risk_section = ""
-
-    return (
+    main_msg = (
         "\u26a0\ufe0f <b>Retrain \u2014 Gate NOT Passed</b>\n"
         "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
         f"\u2502 \U0001f4c5 Trained:  {str(meta.get('train_date', 'N/A'))[:16]} UTC\n"
@@ -970,15 +993,21 @@ def format_retrain_blocked(meta: dict, threshold: float) -> str:
         f"\u2502   EV/day  {up_ev_str}\n"
         "\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
         f"{down_section}"
-        f"{risk_section}"
         "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
         "Candidate saved \u2014 not live.\n"
         "/model to compare  \u2022  /promote_model to override gate"
     )
 
+    return main_msg, _build_risk_table(meta)
 
-def format_retrain_complete(meta: dict, threshold: float) -> str:
-    """Show retrain results for candidate model — UP passed gate, DOWN shown separately."""
+
+def format_retrain_complete(meta: dict, threshold: float) -> tuple[str, str | None]:
+    """Show retrain results for candidate model — UP passed gate, DOWN shown separately.
+
+    Returns a tuple of (main_message, risk_message).
+    *risk_message* is None when no risk data is available.
+    Both messages must be sent with parse_mode='HTML'.
+    """
     _GATE = 0.58
     down_enabled = meta.get("down_enabled", False)
     down_thr     = meta.get("down_threshold", round(1.0 - threshold, 4))
@@ -1024,55 +1053,7 @@ def format_retrain_complete(meta: dict, threshold: float) -> str:
             "\u2502   Not validated\n"
         )
 
-    # Risk block — monospace <code> table, Val | Test columns, fixed-width padding
-    val_risk  = meta.get("val_risk", {})
-    test_risk = meta.get("test_risk", {})
-    wf_dd_d   = meta.get("wf_worst_dd_dollar", 0.0)
-    wf_dd_pct = meta.get("wf_worst_dd_pct", 0.0)
-    wf_ls     = meta.get("wf_worst_loss_streak", 0)
-
-    if val_risk or test_risk:
-        # Each value is padded to a fixed width so the │ separator is always
-        # in the same column position when rendered in Telegram monospace.
-        v_dd_d  = _risk_dd_dollar(val_risk.get("max_dd_dollar", 0.0))
-        t_dd_d  = _risk_dd_dollar(test_risk.get("max_dd_dollar", 0.0))
-        v_dd_p  = _risk_dd_pct(val_risk.get("max_dd_pct", 0.0))
-        t_dd_p  = _risk_dd_pct(test_risk.get("max_dd_pct", 0.0))
-        v_ls    = _risk_streak(val_risk.get("max_loss_streak", 0))
-        t_ls    = _risk_streak(test_risk.get("max_loss_streak", 0))
-        v_ws    = _risk_streak(val_risk.get("max_win_streak", 0))
-        t_ws    = _risk_streak(test_risk.get("max_win_streak", 0))
-        v_pf    = _risk_pf(val_risk.get("profit_factor", 0.0))
-        t_pf    = _risk_pf(test_risk.get("profit_factor", 0.0))
-        v_sh    = _risk_sharpe(val_risk.get("sharpe", 0.0))
-        t_sh    = _risk_sharpe(test_risk.get("sharpe", 0.0))
-        wf_d    = _risk_dd_dollar(wf_dd_d)
-        wf_p    = _risk_dd_pct(wf_dd_pct)
-        wf_ls_s = _risk_streak(wf_ls)
-        _blank  = " " * _RISK_VAL_W
-        # Column layout (monospace):
-        # "Metric         " = 15 chars (label column, ljust to longest label)
-        # val/test values  = fixed-width fields from helper formatters.
-        risk_section = (
-            "\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
-            "\u2502 \u26a0\ufe0f <b>Risk</b>\n"
-            "\u2502 <code>"
-            "Metric         Val        \u2502 Test      \n"
-            f"Max DD $       {v_dd_d} \u2502 {t_dd_d}\n"
-            f"Max DD %       {v_dd_p} \u2502 {t_dd_p}\n"
-            f"Loss streak    {v_ls} \u2502 {t_ls}\n"
-            f"Win streak     {v_ws} \u2502 {t_ws}\n"
-            f"Profit factor  {v_pf} \u2502 {t_pf}\n"
-            f"Sharpe         {v_sh} \u2502 {t_sh}\n"
-            f"WF DD $        {wf_d} \u2502 {_blank}\n"
-            f"WF DD %        {wf_p} \u2502 {_blank}\n"
-            f"WF loss strk   {wf_ls_s} \u2502 {_blank}"
-            "</code>\n"
-        )
-    else:
-        risk_section = ""
-
-    return (
+    main_msg = (
         "\u2705 <b>Retrain Complete</b>\n"
         "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
         f"\u2502 \U0001f4c5 Trained:  {str(meta.get('train_date', 'N/A'))[:16]} UTC\n"
@@ -1086,10 +1067,11 @@ def format_retrain_complete(meta: dict, threshold: float) -> str:
         f"\u2502   EV/day  {up_ev_str}\n"
         "\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
         f"{down_section}"
-        f"{risk_section}"
         "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
         "Use /promote_model to deploy  \u2022  /model to compare"
     )
+
+    return main_msg, _build_risk_table(meta)
 
 
 def format_set_threshold(threshold: float) -> str:
