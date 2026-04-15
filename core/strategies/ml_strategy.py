@@ -269,12 +269,12 @@ class MLStrategy(BaseStrategy):
                 try:
                     import pandas as _pd
                     n1 = df5.iloc[-1]
-                    ts_raw = n1.get("timestamp") if hasattr(n1, "get") else n1["timestamp"]
-                    candle_n1_ts    = str(_pd.Timestamp(ts_raw, tz="UTC").isoformat()) if ts_raw is not None else None
+                    ts_raw = n1["timestamp"]
+                    candle_n1_ts    = str(_pd.Timestamp(ts_raw, unit="ms", tz="UTC").isoformat()) if ts_raw is not None else None
                     candle_n1_close = float(n1["close"])
                     candle_n1_vol   = float(n1["volume"])
-                except Exception:
-                    pass  # non-critical — log will just show None
+                except Exception as _e:
+                    log.debug("inference_logger: candle_n1 extraction failed: %s", _e)
 
             # Update funding rolling buffer — only append when a new 8h settlement
             # has occurred, matching training data semantics (one entry per settlement
