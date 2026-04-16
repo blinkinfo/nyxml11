@@ -473,8 +473,10 @@ def build_live_features(
         )
         return None, []
 
-    # 5m features using last row (index -1 = current candle N)
-    # We use shift(1) = N-1
+    # df5_live[-1] is the still-forming candle N (present, never read as a feature).
+    # safe(series, k=1) returns the N-1 value (last fully-closed candle).
+    # safe(series, k=2) returns N-2, etc.
+    # This matches the training convention where all features use shift(k>=1).
     def safe(series, k=1):
         idx = len(series) - 1 - k
         return series.iloc[idx] if idx >= 0 else np.nan
@@ -497,14 +499,17 @@ def build_live_features(
     lower_wick_n2 = (min(safe(df5["open"], 2), safe(df5["close"], 2)) - safe(df5["low"], 2)) / safe(atr5, 2)
 
     vol_series = df5["volume"].values
-    # volume_ratio_n1: N-1 volume divided by rolling mean of 20 candles ending at N-2
-    # Matches training: vol_mean = df['volume'].shift(2).rolling(20).mean()
-    # which at row i gives mean of vol[i-2]..vol[i-21] — N-1 candle excluded from its own mean.
-    # In the live array (last index = N, second-to-last = N-1):
-    #   N-1 candle value : vol_series[-2]
-    #   Mean window for N-1: vol_series[-22:-2]  (up to and excluding N-1)
-    #   N-2 candle value : vol_series[-3]
-    #   Mean window for N-2: vol_series[-23:-3]  (up to and excluding N-2)
+    # df5[-1] is forming candle N; vol_series[-2] = N-1, vol_series[-3] = N-2.
+    #
+    # volume_ratio_n1: N-1 volume / mean of the 20 candles ending at N-2.
+    # Matches training: df['volume'].shift(2).rolling(20).mean() at row i
+    # = mean(vol[i-2]..vol[i-21]) — N-1 is excluded from its own normaliser.
+    # Live equivalent: vol_series[-2] / mean(vol_series[-22:-2]).
+    #
+    # volume_ratio_n2: N-2 volume / mean of the 20 candles ending at N-3.
+    # Matches training: df['volume'].shift(3).rolling(20).mean() at row i
+    # = mean(vol[i-3]..vol[i-22]).
+    # Live equivalent: vol_series[-3] / mean(vol_series[-23:-3]).
     if len(vol_series) >= 22:
         vol_ratio_n1 = vol_series[-2] / np.mean(vol_series[-22:-2])
     elif len(vol_series) >= 4:
@@ -523,9 +528,11 @@ def build_live_features(
     # 15m features
     if len(df15) >= 14:
         atr15 = compute_atr14(df15)
+        # ts_n1: timestamp of the N-1 (last fully-closed) 5m candle.
+        # df5[-1] is forming candle N, so df5[-2] is N-1.
         ts_n1 = df5["timestamp"].iloc[-2] if len(df5) >= 2 else None
         if ts_n1 is not None and not pd.isna(ts_n1):
-            # Find the last 15m candle at or before ts_n1
+            # Find the last 15m candle whose open is at or before ts_n1
             mask15 = df15["timestamp"] <= ts_n1
             if mask15.any():
                 idx15 = df15[mask15].index[-1]
@@ -549,6 +556,8 @@ def build_live_features(
     # 1h features
     if len(df1h) >= 14:
         atr1h = compute_atr14(df1h)
+        # ts_n1: timestamp of the N-1 (last fully-closed) 5m candle.
+        # df5[-1] is forming candle N, so df5[-2] is N-1.
         ts_n1 = df5["timestamp"].iloc[-2] if len(df5) >= 2 else None
         if ts_n1 is not None and not pd.isna(ts_n1):
             mask1h = df1h["timestamp"] <= ts_n1
@@ -587,8 +596,9 @@ def build_live_features(
         fr = np.nan
         funding_zscore = np.nan
 
-    # OHLCV-native pressure features (live) — identical formulas to build_features
-    # All use N-1 candle (index -2 after the still-forming candle is trimmed by caller)
+    # OHLCV-native pressure features (live) — identical formulas to build_features.
+    # df5[-1] is the forming candle N (present, never read as a feature).
+    # All of these use index -2, which is the N-1 (last fully-closed) candle.
     hl_range_live = (df5["high"] - df5["low"]).clip(lower=1e-9)
     body_live      = df5["close"] - df5["open"]
 
@@ -603,16 +613,18 @@ def build_live_features(
     lower_wick_live = df5[["open", "close"]].min(axis=1) - df5["low"]
     lower_wick_ratio = float(np.clip(lower_wick_live.iloc[-2] / hl_range_live.iloc[-2], 0.0, 1.0))
 
-    # vol_zscore: (vol_n1 - mean20) / std20, window ends at N-1 (index -2)
+    # vol_zscore: (vol_n1 - mean20) / std20.
+    # df5[-2] = N-1 volume; window [-21:-1] = 20 bars ending at N-1 (df5[-1] excluded).
     if len(df5) >= 21:
-        vol_window = df5["volume"].iloc[-21:-1]  # 20 bars ending at N-1 inclusive
+        vol_window = df5["volume"].iloc[-21:-1]  # 20 bars ending at N-1 (index -2)
         v_mean = float(vol_window.mean())
         v_std  = float(vol_window.std(ddof=1))
         vol_zscore = (float(df5["volume"].iloc[-2]) - v_mean) / max(v_std, 1e-8)
     else:
         vol_zscore = np.nan
 
-    # vol_trend: ma5 / ma20 at N-1
+    # vol_trend: ma5 / ma20 at N-1.
+    # Slices [-6:-1] (5 bars) and [-21:-1] (20 bars) both end at N-1 (index -2).
     if len(df5) >= 21:
         vol_ma5_live  = float(df5["volume"].iloc[-6:-1].mean())   # 5 bars ending at N-1
         vol_ma20_live = float(df5["volume"].iloc[-21:-1].mean())  # 20 bars ending at N-1
@@ -621,8 +633,9 @@ def build_live_features(
         vol_trend = np.nan
 
     # -----------------------------------------------------------------------
-    # Time-of-day cyclical features — use N-1 candle timestamp (index -2)
-    # Replaces raw hour_utc and dow with sin/cos encoding.
+    # Time-of-day cyclical features — derived from the N-1 candle timestamp.
+    # df5[-1] is forming candle N, so df5[-2] is N-1 (last fully-closed bar).
+    # Replaces raw hour_utc and dow with sin/cos encoding (no discontinuities).
     # -----------------------------------------------------------------------
     ts_n1_live = df5["timestamp"].iloc[-2] if len(df5) >= 2 else None
     if ts_n1_live is not None and not pd.isna(ts_n1_live):
@@ -636,16 +649,18 @@ def build_live_features(
     else:
         hour_sin = hour_cos = dow_sin = dow_cos = np.nan
 
-    # Volatility regime features — rolling window on atr5 series
+    # Volatility regime features — rolling window on the ATR series.
+    # atr5_arr[-1] corresponds to forming candle N (present, never used as a feature).
+    # atr5_arr[-2] is the N-1 ATR value, matching atr5.shift(1) at the current row
+    # in training. The rolling window also ends at N-1: slice [max(0,L-289):-1]
+    # gives up to 288 values with atr_n1 = atr5_arr[-2] as the last (most recent) entry.
     _ATR_WINDOW = 288
     if len(atr5) >= 14:
-        atr5_arr = atr5.values  # full series up to and including current candle
-        atr_n1 = atr5_arr[-2] if len(atr5_arr) >= 2 else np.nan  # N-1 value
+        atr5_arr = atr5.values  # full series including forming candle N at index -1
+        atr_n1 = atr5_arr[-2] if len(atr5_arr) >= 2 else np.nan  # N-1 ATR value
         if pd.notna(atr_n1):
-            # Window matches training: rolling(288) at the current row includes atr_n1
-            # as the last element — atr5_arr[L-289 .. L-2] in 0-based terms.
-            # Slice atr5_arr[max(0, len-289):-1] gives exactly those 288 values
-            # (or fewer near the start), with atr_n1 = atr5_arr[-2] as the last entry.
+            # Window: up to 288 values ending at atr_n1 (index -2), excluding forming candle.
+            # atr5_arr[max(0, L-289):-1] gives indices [L-289 .. L-2] in 0-based terms.
             window_vals = atr5_arr[max(0, len(atr5_arr)-_ATR_WINDOW-1):-1]
             window_vals = window_vals[~np.isnan(window_vals)]  # strip ATR warmup NaNs
             if len(window_vals) >= 14:
@@ -686,16 +701,23 @@ def build_live_features(
     else:
         rsi14 = np.nan
 
-    # candle_streak (live): consecutive same-direction candles BEFORE N-1
-    # Training uses _streak.shift(1) at row N-1, which gives the streak count
-    # accumulated by candles N-2 and earlier — N-1 itself does NOT contribute.
-    # So we use N-1's direction as the reference but only walk back from N-2 onward.
+    # candle_streak (live): how many consecutive same-direction closed candles
+    # precede the N-1 bar (i.e. streak accumulated by N-2 and earlier).
+    #
+    # Training formula: _streak.shift(1) at row i gives the streak count of
+    # candles [i-2, i-3, ...] that share the same direction as candle i-1.
+    # Candle i-1 (N-1) itself sets the reference direction but is NOT counted.
+    #
+    # Live mapping (df5[-1] = forming candle N, df5[-2] = N-1, df5[-3] = N-2):
+    #   dir_live[-1] = forming candle N direction (ignored)
+    #   dir_live[-2] = N-1 direction  → reference direction
+    #   dir_live[-3] = N-2 direction  → first candle checked in the streak walk
     if len(df5) >= 2:
         dir_live = np.sign(df5["close"].values - df5["open"].values)
-        ref_dir = dir_live[-2]  # N-1 direction (reference, not counted)
+        ref_dir = dir_live[-2]  # N-1 direction: reference, not counted in streak
         streak_val = 0.0
         if ref_dir != 0:
-            # Walk backwards from N-2 (index -3) counting same-direction candles
+            # Walk backwards from N-2 (index -3 in dir_live) counting matching candles
             for k in range(3, len(dir_live) + 1):
                 if dir_live[-k] == ref_dir:
                     streak_val += 1.0
@@ -793,6 +815,7 @@ def build_live_features(
     )
 
     if cvd_live_available:
+        # ts_n1_for_cvd: N-1 timestamp. df5[-1] is forming candle N, df5[-2] is N-1.
         ts_n1_for_cvd = df5["timestamp"].iloc[-2] if len(df5) >= 2 else None
         if ts_n1_for_cvd is not None and not pd.isna(ts_n1_for_cvd):
             _cvd_ts = pd.to_datetime(cvd_live["timestamp"], utc=True).astype("datetime64[ms, UTC]")

@@ -246,17 +246,23 @@ class MLStrategy(BaseStrategy):
             df1h_rows     = len(df1h)     if df1h     is not None else 0
             cvd_rows_raw  = len(cvd_live) if cvd_live is not None and not cvd_live.empty else 0
 
-            # Drop the still-forming 5m candle so inference uses data only up to N-1.
+            # df5 is passed to build_live_features WITH the still-forming candle N
+            # intact as the last row (index -1).  build_live_features always uses
+            # safe(series, k=1) / iloc[-2] to reference the N-1 (last fully-closed)
+            # candle — the forming candle is never read as a feature value.
             #
-            # IMPORTANT PARITY NOTE:
-            # We intentionally do NOT drop the last 15m/1h rows here.
-            # build_live_features() already selects the most recent 15m/1h candle
-            # with timestamp <= ts_n1 (where ts_n1 is the closed 5m N-1 candle).
-            # Dropping 15m/1h pre-emptively can shift those context features one
-            # bucket stale vs training and create train/live feature drift.
-            df5 = df5.iloc[:-1].reset_index(drop=True)
+            # Keeping the forming candle present is required for parity with training:
+            # build_features() operates on a full df5 that includes row i (the "current"
+            # row whose target we are predicting), and all feature shifts are k>=1.
+            # Trimming df5 before calling build_live_features shifts every index by one,
+            # making safe(s,1) return N-2 instead of N-1 — a systematic one-candle lag
+            # that corrupts all 37 features and inverts the model's predictions.
+            #
+            # 15m/1h/CVD are also NOT trimmed: build_live_features selects the most
+            # recent candle with timestamp <= ts_n1 (the N-1 5m bar's timestamp) via
+            # backward merge, so no trimming is needed or correct there either.
 
-            # Row counts after trimming (what the model actually sees)
+            # Row counts (what the model actually sees)
             df5_rows  = len(df5)
             cvd_rows  = len(cvd_live) if cvd_live is not None and not cvd_live.empty else 0
 
