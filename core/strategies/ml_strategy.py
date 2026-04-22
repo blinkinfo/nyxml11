@@ -247,7 +247,7 @@ class MLStrategy(BaseStrategy):
             # Compute the canonical slot-aligned data window for feature parity
             # with the training path.  All fetchers use the same end_ms boundary
             # so the 5m/15m/1h/CVD data is exactly what training would have seen.
-            slot_end_ms = int(slot_ts.timestamp() * 1000)  # exclusive boundary
+            slot_end_ms = int(slot_ts) if isinstance(slot_ts, (int, float)) else int(slot_ts.timestamp() * 1000)  # exclusive boundary
             # Look-back: enough for the model's full context (400 candles) plus
             # the 1h warmup buffer.  450 * 5min = 37.5h, which safely covers
             # the entire training lookback for any feature.
