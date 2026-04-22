@@ -992,16 +992,25 @@ def _format_ranges(ranges: list[tuple[float, float]]) -> str:
 async def get_blocked_threshold_ranges() -> list[tuple[float, float]]:
     """Get blocked threshold ranges from DB, falling back to config default."""
     val = await get_ml_config("blocked_threshold_ranges")
-    if val is not None and val.strip():
-        parsed = _parse_ranges_raw(val)
-        if parsed:
-            return parsed
-    return cfg.BLOCKED_THRESHOLD_RANGES
+    # Row doesn't exist yet (first boot) — use config default
+    if val is None:
+        return cfg.BLOCKED_THRESHOLD_RANGES
+    # Sentinel: user explicitly cleared all ranges
+    if val == "__NONE__":
+        return []
+    if not val.strip():
+        return []
+    parsed = _parse_ranges_raw(val)
+    return parsed if parsed else []
 
 
 async def set_blocked_threshold_ranges(ranges: list[tuple[float, float]]) -> None:
-    """Persist blocked threshold ranges to DB."""
-    formatted = _format_ranges(ranges)
+    """Persist blocked threshold ranges to DB.
+
+    If ranges is empty, sets a sentinel so the getter returns [] rather
+    than falling back to config default.
+    """
+    formatted = "__NONE__" if not ranges else _format_ranges(ranges)
     await set_ml_config("blocked_threshold_ranges", formatted)
 
 

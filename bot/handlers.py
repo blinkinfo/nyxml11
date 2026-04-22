@@ -79,7 +79,7 @@ def _parse_blocked_ranges(raw: str) -> list[tuple[float, float]] | None:
     Returns None if the input is invalid (caller should show usage).
     """
     ranges: list[tuple[float, float]] = []
-    if not raw or not raw.strip():
+    if not raw or not raw.strip() or raw.strip().lower() == "none":
         # Empty string / "none" → clear all ranges
         return ranges
     for part in raw.split(","):
