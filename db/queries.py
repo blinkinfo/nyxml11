@@ -958,6 +958,53 @@ async def set_ml_down_threshold(threshold: float) -> None:
     await set_ml_config("ml_down_threshold", str(threshold))
 
 
+def _parse_ranges_raw(raw: str | None) -> list[tuple[float, float]]:
+    """Parse '0.20-0.22,0.40-0.42' → [(0.20, 0.22), (0.40, 0.42)].
+
+    Mirrors config._parse_blocked_ranges but duplicated here so the DB
+    query module is self-contained and independent of internal config
+    function names.
+    """
+    ranges: list[tuple[float, float]] = []
+    if not raw or not raw.strip():
+        return ranges
+    for part in raw.split(","):
+        part = part.strip()
+        if "-" not in part:
+            continue
+        lo_str, _, hi_str = part.partition("-")
+        try:
+            lo = float(lo_str.strip())
+            hi = float(hi_str.strip())
+        except ValueError:
+            continue
+        if lo > hi:
+            lo, hi = hi, lo
+        ranges.append((lo, hi))
+    return ranges
+
+
+def _format_ranges(ranges: list[tuple[float, float]]) -> str:
+    """Format [(0.2, 0.22)] → '0.20-0.22'."""
+    return ",".join(f"{lo:.2f}-{hi:.2f}" for lo, hi in ranges)
+
+
+async def get_blocked_threshold_ranges() -> list[tuple[float, float]]:
+    """Get blocked threshold ranges from DB, falling back to config default."""
+    val = await get_ml_config("blocked_threshold_ranges")
+    if val is not None and val.strip():
+        parsed = _parse_ranges_raw(val)
+        if parsed:
+            return parsed
+    return cfg.BLOCKED_THRESHOLD_RANGES
+
+
+async def set_blocked_threshold_ranges(ranges: list[tuple[float, float]]) -> None:
+    """Persist blocked threshold ranges to DB."""
+    formatted = _format_ranges(ranges)
+    await set_ml_config("blocked_threshold_ranges", formatted)
+
+
 # ---------------------------------------------------------------------------
 # Model registry helpers
 # ---------------------------------------------------------------------------
