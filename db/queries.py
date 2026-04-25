@@ -768,6 +768,26 @@ async def get_trade_stats(limit: int | None = None) -> dict[str, Any]:
     return await _get_trade_stats_by_demo_flag(False, limit=limit)
 
 
+async def get_all_real_trades_for_export() -> list[dict[str, Any]]:
+    async with aiosqlite.connect(_db()) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT id, signal_id, slot_start, slot_end, side, entry_price, amount_usdc, order_id, fill_price, status, retry_count, outcome, is_win, pnl, resolved_at, routing_mode, routing_policy, original_side, routed_side, policy_bucket, policy_probability FROM trades WHERE is_demo = 0 ORDER BY id ASC"
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_all_demo_trades_for_export() -> list[dict[str, Any]]:
+    async with aiosqlite.connect(_db()) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT id, signal_id, slot_start, slot_end, side, entry_price, amount_usdc, order_id, fill_price, status, retry_count, outcome, is_win, pnl, resolved_at, routing_mode, routing_policy, original_side, routed_side, policy_bucket, policy_probability FROM trades WHERE is_demo = 1 ORDER BY id ASC"
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
 async def get_all_signals_for_export() -> list[dict[str, Any]]:
     async with aiosqlite.connect(_db()) as db:
         db.row_factory = aiosqlite.Row

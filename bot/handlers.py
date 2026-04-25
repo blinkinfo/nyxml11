@@ -336,29 +336,82 @@ async def cmd_download_csv(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     )
 
 
+async def _reply_with_excel_export(
+    query,
+    rows: list[dict[str, Any]],
+    headers: list[str],
+    worksheet_title: str,
+    filename: str,
+    caption: str,
+) -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = worksheet_title
+    ws.append(headers)
+    for row in rows:
+        ws.append([row.get(header) for header in headers])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    await query.message.reply_document(document=buf, filename=filename, caption=caption)
+
+
 @auth_check
 async def cmd_download_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer("Preparing Excel...")
-    rows = await queries.get_all_signals_for_export()
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Signals"
     headers = [
         "id", "slot_start", "side", "model_side", "entry_price", "is_win", "pattern",
         "ml_p_up", "ml_p_down", "ml_probability_bucket", "ml_probability_used",
         "threshold_policy_real", "threshold_policy_demo",
     ]
-    ws.append(headers)
-    for r in rows:
-        ws.append([r.get(h) for h in headers])
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    await query.message.reply_document(
-        document=buf,
+    await _reply_with_excel_export(
+        query=query,
+        rows=await queries.get_all_signals_for_export(),
+        headers=headers,
+        worksheet_title="Signals",
         filename="signals.xlsx",
         caption="\U0001f4e5 All signals export (Excel)",
+    )
+
+
+@auth_check
+async def cmd_download_trades_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer("Preparing Excel...")
+    headers = [
+        "id", "signal_id", "slot_start", "slot_end", "side", "entry_price", "amount_usdc",
+        "order_id", "fill_price", "status", "retry_count", "outcome", "is_win", "pnl",
+        "resolved_at", "routing_mode", "routing_policy", "original_side", "routed_side",
+        "policy_bucket", "policy_probability",
+    ]
+    await _reply_with_excel_export(
+        query=query,
+        rows=await queries.get_all_real_trades_for_export(),
+        headers=headers,
+        worksheet_title="Trades",
+        filename="trades.xlsx",
+        caption="\U0001f4e5 All trades export (Excel)",
+    )
+
+
+@auth_check
+async def cmd_download_demo_trades_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer("Preparing Excel...")
+    headers = [
+        "id", "signal_id", "slot_start", "slot_end", "side", "entry_price", "amount_usdc",
+        "order_id", "fill_price", "status", "retry_count", "outcome", "is_win", "pnl",
+        "resolved_at", "routing_mode", "routing_policy", "original_side", "routed_side",
+        "policy_bucket", "policy_probability",
+    ]
+    await _reply_with_excel_export(
+        query=query,
+        rows=await queries.get_all_demo_trades_for_export(),
+        headers=headers,
+        worksheet_title="Demo Trades",
+        filename="demo_trades.xlsx",
+        caption="\U0001f4e5 All demo trades export (Excel)",
     )
 
 
@@ -518,6 +571,10 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await cmd_download_csv(update, context)
     elif data == "download_xlsx":
         await cmd_download_excel(update, context)
+    elif data == "download_trades_xlsx":
+        await cmd_download_trades_excel(update, context)
+    elif data == "download_demo_trades_xlsx":
+        await cmd_download_demo_trades_excel(update, context)
     elif data == "redeem_confirm":
         await _handle_redeem_confirm(update, context)
     elif data == "redeem_cancel":
