@@ -478,11 +478,11 @@ async def cmd_demo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_thresholds(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
         "\U0001f500 <b>Threshold Routing</b>\n"
-        "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+        "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
         "\u2502  \U0001f500 Per-bucket signal routing\n"
         "\u2502  Real and demo configured separately\n"
         "\u2502  Unset buckets \u2192 \U0001f7e2 FOLLOW by default\n"
-        "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+        "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
     )
     if update.callback_query:
         await update.callback_query.answer()
@@ -652,12 +652,12 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         mode_emoji = "\U0001f4ca" if mode == "real" else "\U0001f9ea"
         prompt = (
             f"\u270f\ufe0f <b>Set Bucket Policy \u2014 {mode.upper()}</b>\n"
-            "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
             f"\u2502  {mode_emoji} Enter the bucket value to configure\n"
             "\u2502\n"
             "\u2502  Example:  <code>0.53</code>  or  <code>0.57</code>\n"
             "\u2502  Range:    0.00 \u2013 1.00\n"
-            "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
             "Reply with the bucket number now."
         )
         await _safe_edit(query, prompt, reply_markup=threshold_cancel_keyboard(mode))
@@ -667,12 +667,12 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         mode_emoji = "\U0001f4ca" if mode == "real" else "\U0001f9ea"
         prompt = (
             f"\U0001f5d1 <b>Clear Bucket Policy \u2014 {mode.upper()}</b>\n"
-            "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
             f"\u2502  {mode_emoji} Enter the bucket value to clear\n"
             "\u2502\n"
             "\u2502  Example:  <code>0.53</code>  or  <code>0.57</code>\n"
             "\u2502  Range:    0.00 \u2013 1.00\n"
-            "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
             "Reply with the bucket number now."
         )
         await _safe_edit(query, prompt, reply_markup=threshold_cancel_keyboard(mode))
@@ -683,10 +683,10 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         p_emoji = _policy_emoji.get(policy, "\u2022")
         confirm = (
             f"\u2705 <b>Policy Set \u2014 {mode.upper()}</b>\n"
-            "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
             f"\u2502  \U0001faa3 Bucket:  <b>{bucket}</b>\n"
             f"\u2502  \U0001f4cc Policy:  {p_emoji} {policy}\n"
-            "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+            "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
         )
         await query.answer(f"{mode} bucket {bucket} \u2192 {policy}")
         await _safe_edit(query, confirm, reply_markup=threshold_mode_keyboard(mode))
@@ -810,14 +810,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         mode_emoji = "\U0001f4ca" if mode == "real" else "\U0001f9ea"
         policy_card = (
             f"\U0001f3af <b>Set Policy \u2014 {mode.upper()}</b>  \u2502  Bucket <b>{bucket}</b>\n"
-            "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
             "\u2502  Choose how signals in this bucket\n"
             "\u2502  should be routed:\n"
-            "\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            "\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
             "\u2502  \U0001f7e2 FOLLOW  \u2014 trade as model says\n"
             "\u2502  \U0001f534 BLOCK   \u2014 skip this signal\n"
             "\u2502  \U0001f501 INVERT  \u2014 flip direction\n"
-            "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+            "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
         )
         await update.message.reply_text(
             policy_card,
@@ -841,10 +841,10 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await queries.clear_threshold_policy(bucket, mode)
         clear_confirm = (
             f"\U0001f5d1 <b>Policy Cleared \u2014 {mode.upper()}</b>\n"
-            "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            "\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
             f"\u2502  \U0001faa3 Bucket:  <b>{bucket}</b>\n"
             f"\u2502  \u21a9\ufe0f Now defaults to \U0001f7e2 FOLLOW\n"
-            "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+            "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
         )
         await update.message.reply_text(
             clear_confirm,

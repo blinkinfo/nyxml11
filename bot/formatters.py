@@ -90,13 +90,13 @@ def _build_risk_table(meta: dict) -> str | None:
     if not val_risk and not test_risk:
         return None
 
-    # ── Drawdown dollar ──────────────────────────────────────────────────
+    # ── Drawdown dollar ──────────────────────────────────────────────
     v_dd_d = _fmt_dd_dollar(val_risk.get("max_dd_dollar", 0.0))
     t_dd_d = _fmt_dd_dollar(test_risk.get("max_dd_dollar", 0.0))
     v_dd_p = _fmt_dd_pct(val_risk.get("max_dd_pct", 0.0))
     t_dd_p = _fmt_dd_pct(test_risk.get("max_dd_pct", 0.0))
 
-    # ── Other per-split metrics ───────────────────────────────────────────
+    # ── Other per-split metrics ───────────────────────────────────────
     v_ls = _fmt_streak(val_risk.get("max_loss_streak", 0))
     t_ls = _fmt_streak(test_risk.get("max_loss_streak", 0))
     v_ws = _fmt_streak(val_risk.get("max_win_streak", 0))
@@ -112,7 +112,7 @@ def _build_risk_table(meta: dict) -> str | None:
     wf_ls    = meta.get("wf_worst_loss_streak", 0)
     has_wf   = any([wf_dd_d, wf_dd_p, wf_ls])
 
-    # ── Build message ─────────────────────────────────────────────────────
+    # ── Build message ─────────────────────────────────────────────────
     lines: list[str] = [
         f"\u26a0\ufe0f <b>Risk Metrics</b>\n{_RISK_DIV}\n",
         # Drawdown — given its two sub-values ($ and %), use a dedicated block
@@ -480,16 +480,16 @@ def format_threshold_policy_notification(
 
     return (
         f"\U0001f6a6 <b>Threshold Policy \u2014 {mode.upper()}</b>\n"
-        f"\u250c{'─'*29}\n"
+        f"\u250c{'─'*25}\n"
         f"\u2502  \u23f0 Slot:    {slot_start_str} \u2013 {slot_end_str} UTC\n"
         f"\u2502  {model_emoji} Model:   {model_side}\n"
         f"\u2502  \U0001faa3 Bucket:  {bucket or 'n/a'}\n"
         f"\u2502  \U0001f4ca Prob:    {prob_text}\n"
-        f"\u251c{'─'*29}\n"
+        f"\u251c{'─'*25}\n"
         f"\u2502  \U0001f4cc Policy:  {policy}\n"
         f"\u2502  {result_emoji} Result:  {routed_text}"
         f"{note_line}\n"
-        f"\u2514{'─'*29}"
+        f"\u2514{'─'*25}"
     )
 
 
@@ -574,9 +574,9 @@ _POLICY_EMOJI = {
 def format_threshold_policy_dashboard(mode: str, rows: list[dict[str, Any]], label: str = 'Configured Buckets') -> str:
     mode_emoji = '\U0001f4ca' if mode == 'real' else '\U0001f9ea'
     header = f"{mode_emoji} <b>{mode.capitalize()} \u2014 Bucket Policies</b>"
-    top = f"\u250c{'─'*29}"
-    mid = f"\u251c{'─'*29}"
-    bot = f"\u2514{'─'*29}"
+    top = f"\u250c{'─'*25}"
+    mid = f"\u251c{'─'*25}"
+    bot = f"\u2514{'─'*25}"
 
     if not rows:
         return (
@@ -607,9 +607,9 @@ def format_threshold_policy_dashboard(mode: str, rows: list[dict[str, Any]], lab
 def format_threshold_analytics(mode: str, rows: list[dict[str, Any]], label: str = 'All Time') -> str:
     mode_emoji = '\U0001f4c8' if mode == 'real' else '\U0001f9ea'
     header = f"{mode_emoji} <b>Threshold Analytics \u2014 {mode.upper()}</b>  \u00b7  {label}"
-    top = f"\u250c{'─'*29}"
-    mid = f"\u251c{'─'*29}"
-    bot = f"\u2514{'─'*29}"
+    top = f"\u250c{'─'*25}"
+    mid = f"\u251c{'─'*25}"
+    bot = f"\u2514{'─'*25}"
 
     if not rows:
         return (
