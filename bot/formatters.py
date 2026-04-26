@@ -504,33 +504,36 @@ def format_demo_trade_placed(
     slot_start_str: str = '',
     slot_end_str: str = '',
 ) -> str:
-    # Model → executed line: show arrow + INVERT label when sides differ
+    # Model → executed line: compact single-line, fits W=25 box
     if policy == 'INVERT':
-        model_emoji = '\U0001f4c8' if original_side.upper() == 'UP' else '\U0001f4c9'
-        exec_emoji  = '\U0001f4c9' if original_side.upper() == 'UP' else '\U0001f4c8'
-        model_line  = f'{model_emoji} {original_side} \u2192 \U0001f501 {exec_emoji} {side} (INVERT)'
+        orig_up = original_side.upper() == 'UP'
+        from_emoji = '\U0001f4c8' if orig_up else '\U0001f4c9'
+        to_emoji   = '\U0001f4c9' if orig_up else '\U0001f4c8'
+        from_label = original_side.capitalize()
+        to_label   = side.capitalize()
+        model_line = f'\U0001f501 INVERT: {from_emoji}{from_label} \u2192 {to_emoji}{to_label}'
     else:
         model_emoji = '\U0001f4c8' if side.upper() == 'UP' else '\U0001f4c9'
-        model_line  = f'{model_emoji} Model:    {side}'
+        model_line  = f'{model_emoji} Model: {side.capitalize()}'
 
     slot_line = (
-        f'\u2502  \u23f0 Slot:     {slot_start_str} \u2013 {slot_end_str} UTC\n'
+        f'\u2502 \u23f0 {slot_start_str} \u2013 {slot_end_str} UTC\n'
         if slot_start_str else ''
     )
 
-    _top = '\u250c' + '\u2500' * 29
-    _mid = '\u251c' + '\u2500' * 29
-    _bot = '\u2514' + '\u2500' * 29
+    _top = '\u250c' + '\u2500' * 25
+    _mid = '\u251c' + '\u2500' * 25
+    _bot = '\u2514' + '\u2500' * 25
     return (
         f'\U0001f9ea <b>[DEMO] Trade Placed</b>\n'
         f'{_top}\n'
         f'{slot_line}'
-        f'\u2502  {model_line}\n'
-        f'\u2502  \U0001faa3 Bucket:   {bucket or "n/a"}\n'
+        f'\u2502 {model_line}\n'
+        f'\u2502 \U0001faa3 Bucket:  {bucket or "n/a"}\n'
         f'{_mid}\n'
-        f'\u2502  \U0001f4b5 Entry:    ${entry_price:.2f}\n'
-        f'\u2502  \U0001f4e6 Size:     ${amount_usdc:.2f}\n'
-        f'\u2502  \U0001f3e6 Bankroll: ${new_bankroll:,.2f}\n'
+        f'\u2502 \U0001f4b5 Entry:    ${entry_price:.2f}\n'
+        f'\u2502 \U0001f4e6 Size:     ${amount_usdc:.2f}\n'
+        f'\u2502 \U0001f3e6 Bankroll: ${new_bankroll:,.2f}\n'
         f'{_bot}'
     )
 
@@ -542,6 +545,8 @@ def format_demo_trade_skipped(
     bucket: str | None = None,
     policy: str | None = None,
 ) -> str:
+    import unicodedata as _ud
+
     # Derive reason emoji from policy if available, else generic
     if policy == 'BLOCK':
         reason_emoji = '\U0001f534'
@@ -550,16 +555,46 @@ def format_demo_trade_skipped(
     else:
         reason_emoji = '\u26a0\ufe0f'
 
-    _top = '\u250c' + '\u2500' * 29
-    _mid = '\u251c' + '\u2500' * 29
-    _bot = '\u2514' + '\u2500' * 29
+    # Truncate reason text to fit inside W=25 box on one line.
+    # Prefix cost: │(1) + space(1) + emoji(2 or 4 for ⚠️) + space(1)
+    # Compute dynamically so ⚠️ variation-selector doesn't throw off count.
+    def _prefix_cols(emoji: str) -> int:
+        c = 0
+        for ch in f'\u2502 {emoji} ':
+            cat = _ud.category(ch)
+            if cat == 'Mn':  # variation/combining = 0 width
+                continue
+            c += 2 if _ud.east_asian_width(ch) in ('W', 'F') else 1
+        return c
+
+    _W = 25
+    _box_w = _W + 1  # ┌ + 25 dashes = 26 visual cols
+    _avail = _box_w - _prefix_cols(reason_emoji)
+
+    def _fit(text: str, avail: int) -> str:
+        out, c = '', 0
+        for ch in _e(text):
+            cat = _ud.category(ch)
+            if cat == 'Mn':
+                out += ch
+                continue
+            w = 2 if _ud.east_asian_width(ch) in ('W', 'F') else 1
+            if c + w > avail - 1:
+                return out + '\u2026'
+            out += ch
+            c += w
+        return out
+
+    _top = '\u250c' + '\u2500' * _W
+    _mid = '\u251c' + '\u2500' * _W
+    _bot = '\u2514' + '\u2500' * _W
     return (
         f'\U0001f9ea <b>[DEMO] Trade Skipped</b>\n'
         f'{_top}\n'
-        f'\u2502  \u23f0 Slot:    {slot_start_str} \u2013 {slot_end_str} UTC\n'
-        f'\u2502  \U0001faa3 Bucket:  {bucket or "n/a"}\n'
+        f'\u2502 \u23f0 {slot_start_str} \u2013 {slot_end_str} UTC\n'
+        f'\u2502 \U0001faa3 Bucket: {bucket or "n/a"}\n'
         f'{_mid}\n'
-        f'\u2502  {reason_emoji} Reason:  {_e(reason)}\n'
+        f'\u2502 {reason_emoji} {_fit(reason, _avail)}\n'
         f'{_bot}'
     )
 
